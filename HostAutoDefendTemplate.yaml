@@ -1,0 +1,257 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: 'AWS::LanguageExtensions'
+Description: Stack for IAM roles and user for Host Auto-Defend
+Outputs: 
+  PrismaCloudRole:
+    Description: Prisma Cloud Role ARN
+    Value:
+      Fn::GetAtt: [AssumedRole, Arn]
+Parameters:
+  PrismaCloudRoleName:
+    AllowedPattern: '[-_a-zA-Z0-9]+'
+    Default: PrismaCloudRoleHostAutoDefend
+    Description: Provide an role ARN name (Example PrismaCloudRoleHostAutoDefend). Maximum 64 characters allowed
+    Type: String
+    MaxLength: 64
+    MinLength: 1
+  userName:
+    AllowedPattern: '[-_a-zA-Z0-9]+'
+    Default: prismacloud
+    Description: Provide the name of the user to be created for Host Auto-Defend
+    Type: String
+  externalId:
+    AllowedPattern: '[-_a-zA-Z0-9]+'
+    Default: 11111111-1111-1111-1111-111111111111
+    Description: Provide the External Id to be used to Assume the role
+    Type: String
+  OrganizationalUnitIds:
+    AllowedPattern: ^(ou-|r-)[a-z0-9-]+(?:,( )*(ou-|r-)[a-z0-9-]+)*$
+    Description: Provide the organizational root OU ID (Prefix like r-) if you want to run it for all the accounts under this Organization. Else provide a comma-separated list of OU ids(Prefix like ou-).
+    Type: CommaDelimitedList
+Resources:
+  UserAssumeRolePolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: 
+        Fn::Join:
+          - ""
+          - - Ref:
+                userName
+            - "AssumeRolePolicy"
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: PrismaCloudComputeAssumeRole
+            Effect: Allow
+            Action:
+              - "sts:AssumeRole"
+            Resource: 
+              Fn::Join:
+                - ""
+                - - "arn:aws:iam::*:role/"
+                  - Ref:
+                      PrismaCloudRoleName
+  UserGroup:
+    Type: AWS::IAM::Group
+    DependsOn:
+      - UserAssumeRolePolicy
+      - OrgPolicy
+    Properties:
+      GroupName:
+        Fn::Join:
+          - ""
+          - - Ref:
+                userName
+            - "Group"
+      ManagedPolicyArns:
+        - Fn::GetAtt: [UserAssumeRolePolicy, PolicyArn]
+        - Fn::GetAtt: [OrgPolicy, PolicyArn]
+  User:
+    Type: AWS::IAM::User
+    DependsOn:
+      - UserGroup
+    Properties:
+      UserName:
+        Ref:
+          userName
+      Groups:
+        - Fn::Join:
+            - ""
+            - - Ref:
+                  userName
+              - "Group"
+  HostAutoDefend:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: HostAutoDefend
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: PrismaCloudComputeHostAutoDefend
+            Effect: Allow
+            Action:
+              - "ec2:DescribeRegions"
+              - "ec2:DescribeInstances"
+              - "ssm:SendCommand"
+            Resource: "*"
+  OrgPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: OrgPolicy
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: PrismaCloudComputeOrgPolicy
+            Effect: Allow
+            Action:
+              - "organizations:ListAccounts"
+            Resource: "*"
+  AssumedRole:
+    Type: AWS::IAM::Role
+    DependsOn:
+      - User
+      - HostAutoDefend
+    Properties:
+      RoleName: 
+        Ref:
+          PrismaCloudRoleName
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS:
+                Fn::GetAtt: [User, Arn]
+            Action:
+              - "sts:AssumeRole"
+      ManagedPolicyArns:
+        - Fn::GetAtt: [HostAutoDefend, PolicyArn]
+  StackSet:
+    Type: AWS::CloudFormation::StackSet
+    Properties:
+      AutoDeployment:
+        Enabled: true
+        RetainStacksOnAccountRemoval: false
+      OperationPreferences:
+        FailureTolerancePercentage: 100
+        RegionConcurrencyType: PARALLEL
+      Parameters:
+        - ParameterKey: PrismaCloudRoleName
+          ParameterValue: 
+            Ref: PrismaCloudRoleName
+        - ParameterKey: userArn
+          ParameterValue: 
+            Fn::GetAtt: [User, Arn]
+        - ParameterKey: externalId
+          ParameterValue: 
+            Ref: externalId
+      Capabilities:
+        - CAPABILITY_NAMED_IAM
+      PermissionModel: SERVICE_MANAGED
+      StackInstancesGroup:
+        - DeploymentTargets:
+            OrganizationalUnitIds: 
+              Ref: OrganizationalUnitIds
+          Regions:
+            - Ref: AWS::Region
+      StackSetName:
+        Ref: AWS::StackName
+      TemplateBody: |
+        {
+          "AWSTemplateFormatVersion": "2010-09-09",
+          "Description": "Stack for IAM roles and user for Serverless Scanning",
+          "Outputs": {
+            "PrismaCloudRole": {
+              "Description": "Prisma Cloud Role ARN",
+              "Value": {
+                "Fn::GetAtt": [
+                  "AssumedRole",
+                  "Arn"
+                ]
+              }
+            }
+          },
+          "Parameters": {
+            "PrismaCloudRoleName": {
+              "AllowedPattern": "[-_a-zA-Z0-9]+",
+              "Default": "PrismaCloudRoleServerless",
+              "Description": "Provide an role ARN name (Example PrismaCloudRoleServeless). Maximum 64 characters allowed",
+              "Type": "String",
+              "MaxLength": 64,
+              "MinLength": 1
+            },
+            "userArn": {
+              "Description": "Provide the ARN of the user to be created for Serverless Scanning",
+              "Type": "String"
+            },
+            "externalId": {
+              "Description": "Provide the External Id to be used to Assume the role",
+              "Type": "String"
+            }
+          },
+          "Resources": {
+            "HostAutoDefend": {
+              "Type": "AWS::IAM::ManagedPolicy",
+              "Properties": {
+                "ManagedPolicyName": "HostAutoDefend",
+                "PolicyDocument": {
+                  "Version": "2012-10-17",
+                  "Statement": [
+                    {
+                      "Sid": "PrismaCloudComputeHostAutoDefend",
+                      "Effect": "Allow",
+                      "Action": [
+                        "ec2:DescribeRegions"
+                        "ec2:DescribeInstances",
+                        "ssm:SendCommand"
+                      ],
+                      "Resource": "*"
+                    }
+                  ]
+                }
+              }
+            },
+            "AssumedRole": {
+              "Type": "AWS::IAM::Role",
+              "DependsOn": [
+                "HostAutoDefend"
+              ],
+              "Properties": {
+                "RoleName": {
+                  "Ref": "PrismaCloudRoleName"
+                },
+                "AssumeRolePolicyDocument": {
+                  "Version": "2012-10-17",
+                  "Statement": [
+                    {
+                      "Effect": "Allow",
+                      "Principal": {
+                        "AWS": {
+                          "Ref": "userArn"
+                        }
+                      },
+                      "Action": [
+                        "sts:AssumeRole"
+                      ],
+                      "Condition": {
+                        "StringEquals": {
+                          "sts:ExternalId": {
+                            "Ref": "externalId"
+                          }
+                        }
+                      }
+                    }
+                  ]
+                },
+                "ManagedPolicyArns": [
+                  {
+                    "Fn::GetAtt": [
+                      "HostAutoDefend",
+                      "PolicyArn"
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        }
