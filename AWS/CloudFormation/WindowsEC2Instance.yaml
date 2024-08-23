@@ -1,0 +1,140 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  Windows EC2 instance with UserData script that installs Prisma Cloud Defender.
+
+Parameters:
+  InstanceType:
+    Description: EC2 instance type
+    Type: String
+    Default: t2.micro
+    AllowedValues: 
+      - t2.micro
+      - t2.small
+      - t2.medium
+    ConstraintDescription: Must be a valid EC2 instance type.
+
+  KeyName:
+    Description: Name of an existing EC2 KeyPair to enable SSH access to the instance
+    Type: AWS::EC2::KeyPair::KeyName
+    ConstraintDescription: Must be the name of an existing EC2 KeyPair.
+
+  EC2InstanceProfile:
+    Description: Name of an Instance Profile to Access Prisma Cloud Secrets
+    Type: String
+    Default: PCSecret
+    ConstraintDescription: Must be the name of an existing EC2 Instance Profile.
+
+  SecretArn:
+    AllowedPattern: '^arn:aws:secretsmanager:(us(-gov)?|ap|ca|cn|eu|sa)-(central|(north|south)?(east|west)?)-\d:(\d{12})?:secret:[\w+=,.@-]{1,128}$'
+    Description: ARN of the Secret where is stored the Access to Prisma Cloud
+    Type: String
+
+  SecretRegion:
+    AllowedPattern: '(us(-gov)?|ap|ca|cn|eu|sa)-(central|(north|south)?(east|west)?)-\d'
+    Description: Region where the Secret is stored
+    Type: String
+
+  RoleArn:
+    AllowedPattern: '^arn:aws:iam::(\d{12})?:role/[\w+=,.@-]{1,128}$'
+    Description: ARN of the Role to be Assumed to Extract the Secret
+    Type: String
+
+  SessionName:
+    AllowedPattern: '[-_a-zA-Z0-9]+'
+    Default: PCSecret3rx5HJvSD1
+    Description: Provide the name of the session to Access to Prisma Cloud Secrets. Maximum 64 characters allowed
+    Type: String
+    MaxLength: 64
+    MinLength: 1
+
+  AMIId:
+    AllowedPattern: '^ami-[0-9a-f]{1,18}$'
+    Description: AMI ID used to deploy the EC2 Instance
+    Type: String
+
+Resources:
+  WindowsEC2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: !Ref InstanceType
+      KeyName: !Ref KeyName
+      ImageId: !Ref AMIId # Update this to the appropriate Windows AMI for your region
+      IamInstanceProfile: !Ref EC2InstanceProfile
+      UserData: 
+        Fn::Base64: !Sub
+        - |
+          <powershell>
+          # Install AWS CLI if not Installed
+          if (-not (Get-Command "aws" -ErrorAction SilentlyContinue)) {
+              $aws_cli_installed = $true
+              Write-Output "AWS CLI not found. Installing it..."
+              Start-Process -FilePath "msiexec.exe" -ArgumentList "/i https://awscli.amazonaws.com/AWSCLIV2.msi /quiet" -Wait
+              $Env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine")
+          }
+
+          # Assume Role to access to Secrets
+          $assumed_role = aws sts assume-role --role-arn ${ROLE_ARN} --role-session-name ${SESSION_NAME} | ConvertFrom-Json
+
+          # Set the temporary credentials as environment variables
+          $Env:AWS_ACCESS_KEY_ID = $assumed_role.Credentials.AccessKeyId
+          $Env:AWS_SECRET_ACCESS_KEY = $assumed_role.Credentials.SecretAccessKey
+          $Env:AWS_SESSION_TOKEN = $assumed_role.Credentials.SessionToken
+
+          # Retrieve the Secret
+          $secretValue = aws secretsmanager get-secret-value --secret-id ${SECRET_ARN} --region ${REGION} --query 'SecretString' --output text
+
+          # Convert secret JSON to PowerShell object
+          $secretJson = ConvertFrom-Json -InputObject $secretValue
+
+          # Extract JSON values
+          $PCC_URL = $secretJson.PCC_URL
+          $PCC_SAN = $secretJson.PCC_SAN
+          $PCC_USER = $secretJson.PCC_USER
+          $PCC_PASS = $secretJson.PCC_PASS
+
+          $Body = @{
+              username = $PCC_USER
+              password = $PCC_PASS
+          }
+          $token = (Invoke-RestMethod -Method 'Post' -Uri $PCC_URL/api/v1/authenticate -Body ($Body | ConvertTo-Json) -ContentType 'application/json').token
+
+          #Parameters to download the defender script
+          $parameters = @{ 
+              Uri = "$PCC_URL/api/v1/scripts/defender.ps1"
+              Method = "Post"
+              Headers = @{
+                  "authorization" = "Bearer $token" 
+              } 
+              OutFile = "defender.ps1" 
+          }
+
+          #Set type of defender based on the requirements
+          $defenderType = "serverWindows"
+          try {
+              docker ps
+              $defenderType = "dockerWindows"
+          } catch {
+              echo "Docker is not running"
+              try {
+              ctr c ls
+              $defenderType = "containerdWindows"
+              } catch {
+              echo "Containerd is not running"
+              }
+          }
+
+          #Download and Install defender
+          Invoke-WebRequest @parameters
+          .\defender.ps1 -type $defenderType -consoleCN $PCC_SAN -install -u
+
+          if ( $aws_cli_installed ){
+              Write-Output "Deleting AWS CLI since it was not installed..."
+              Start-Process -FilePath "msiexec.exe" -ArgumentList "/x https://awscli.amazonaws.com/AWSCLIV2.msi /quiet" -Wait
+              rm "$Env:UserProfile\.aws" -r -force
+          }
+          Remove-Item $PSCommandPath -Force
+          </powershell>
+        - SECRET_ARN: !Ref SecretArn
+          REGION: !Ref SecretRegion
+          ROLE_ARN: !Ref RoleArn
+          SESSION_NAME: !Ref SessionName

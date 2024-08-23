@@ -1,0 +1,77 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  Linux EC2 instance with UserData script that installs Prisma Cloud Defender.
+
+Parameters:
+  InstanceType:
+    Description: EC2 instance type
+    Type: String
+    Default: t2.micro
+    AllowedValues: 
+      - t2.micro
+      - t2.small
+      - t2.medium
+      - t4g.micro
+      - t4g.small
+      - t4g.medium
+    ConstraintDescription: Must be a valid EC2 instance type.
+
+  KeyName:
+    Description: Name of an existing EC2 KeyPair to enable SSH access to the instance
+    Type: AWS::EC2::KeyPair::KeyName
+    ConstraintDescription: Must be the name of an existing EC2 KeyPair.
+
+  EC2InstanceProfile:
+    Description: Name of an Instance Profile to Access Prisma Cloud Secrets
+    Type: String
+    Default: PCSecret
+    ConstraintDescription: Must be the name of an existing EC2 Instance Profile.
+
+  SecretArn:
+    AllowedPattern: '^arn:aws:secretsmanager:(us(-gov)?|ap|ca|cn|eu|sa)-(central|(north|south)?(east|west)?)-\d:(\d{12})?:secret:[\w+=,.@-]{1,128}$'
+    Description: ARN of the Secret where is stored the Access to Prisma Cloud
+    Type: String
+
+  SecretRegion:
+    AllowedPattern: '(us(-gov)?|ap|ca|cn|eu|sa)-(central|(north|south)?(east|west)?)-\d'
+    Description: Region where the Secret is stored
+    Type: String
+
+  RoleArn:
+    AllowedPattern: '^arn:aws:iam::(\d{12})?:role/[\w+=,.@-]{1,128}$'
+    Description: ARN of the Role to be Assumed to Extract the Secret
+    Type: String
+
+  SessionName:
+    AllowedPattern: '[-_a-zA-Z0-9]+'
+    Default: PCSecret3rx5HJvSD1
+    Description: Provide the name of the session to Access to Prisma Cloud Secrets. Maximum 64 characters allowed
+    Type: String
+    MaxLength: 64
+    MinLength: 1
+
+  AMIId:
+    AllowedPattern: '^ami-[0-9a-f]{1,18}$'
+    Description: AMI ID used to deploy the EC2 Instance
+    Type: String
+
+Resources:
+  LinuxEC2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: !Ref InstanceType
+      KeyName: !Ref KeyName
+      ImageId: !Ref AMIId # Update this to the appropriate Windows AMI for your region
+      IamInstanceProfile: !Ref EC2InstanceProfile
+      UserData: 
+        Fn::Base64: !Sub 
+        - |
+          #!/bin/bash
+          echo "IyEvYmluL2Jhc2gKIyBNYW5kYXRvcnkgdmFyaWFibGVzClNFQ1JFVF9BUk49IiQxIgpSRUdJT049IiQyIgpST0xFX0FSTj0iJDMiClNFU1NJT05fTkFNRT0iJDQiCgojIEluc3RhbGwgQVdTIENMSSwganEgYW5kIGN1cmwgKGlmIG5vdCBpbnN0YWxsZWQpCm5vdF9pbnN0YWxsZWRfcGFja2FnZXM9IiIKaWYgISBjb21tYW5kIC12IGN1cmwgJj4gL2Rldi9udWxsOyB0aGVuIG5vdF9pbnN0YWxsZWRfcGFja2FnZXMrPSJjdXJsIjsgZmkKaWYgISBjb21tYW5kIC12IGpxICY+IC9kZXYvbnVsbDsgdGhlbiBub3RfaW5zdGFsbGVkX3BhY2thZ2VzKz0iIGpxIjsgZmkKCmlmIFtbIC1uICIkbm90X2luc3RhbGxlZF9wYWNrYWdlcyIgXV0KdGhlbgogICAgZWNobyAiUGFja2FnZXMgJG5vdF9pbnN0YWxsZWRfcGFja2FnZXMgbm90IGluc3RhbGxlZC4gSW5zdGFsbGluZyBwZW5kaW5nIHBhY2thZ2VzLi4uIgogICAgaWYgY29tbWFuZCAtdiB5dW0gPiAvZGV2L251bGwgCiAgICB0aGVuCiAgICAgICAgc3VkbyB5dW0gaW5zdGFsbCAteSAkbm90X2luc3RhbGxlZF9wYWNrYWdlcyA+IC9kZXYvbnVsbAogICAgZWxzZQogICAgICAgIHN1ZG8gYXB0IHVwZGF0ZSAmPiAvZGV2L251bGwgJiYgc3VkbyBhcHQgaW5zdGFsbCAteSAkbm90X2luc3RhbGxlZF9wYWNrYWdlcyAmPiAvZGV2L251bGwKICAgIGZpCmZpCgppZiAhIGNvbW1hbmQgLXYgYXdzICY+IC9kZXYvbnVsbAp0aGVuCiAgICBpZiAhIGNvbW1hbmQgLXYgdW56aXAgJj4gL2Rldi9udWxsCiAgICB0aGVuIAogICAgICAgIGVjaG8gIlVuemlwIG5vdCBmb3VuZC4gUmVxdWlyZWQgZm9yIEFXUyBDTEkgaW5zdGFsbGF0aW9uLiBJbnN0YWxsaW5nIGl0Li4uIgogICAgICAgIG5vdF9pbnN0YWxsZWRfcGFja2FnZXMrPSIgdW56aXAiCiAgICAgICAgaWYgY29tbWFuZCAtdiB5dW0gJj4gL2Rldi9udWxsIAogICAgICAgIHRoZW4KICAgICAgICAgICAgc3VkbyB5dW0gaW5zdGFsbCAteSB1bnppcAogICAgICAgIGVsc2UKICAgICAgICAgICAgc3VkbyBhcHQgdXBkYXRlICY+IC9kZXYvbnVsbCAmJiBzdWRvIGFwdCBpbnN0YWxsIC15IHVuemlwICY+IC9kZXYvbnVsbAogICAgICAgIGZpCiAgICBmaQogICAgZWNobyAiQVdTIENMSSBub3QgZm91bmQuIEluc3RhbGxpbmcgaXQuLi4iCiAgICBpbnN0YWxsZWRfYXdzY2xpPSJ0cnVlIgogICAgY3VybCAtcyAiaHR0cHM6Ly9hd3NjbGkuYW1hem9uYXdzLmNvbS9hd3NjbGktZXhlLWxpbnV4LXg4Nl82NC56aXAiIC1vICJhd3NjbGl2Mi56aXAiCiAgICB1bnppcCAtcXEgYXdzY2xpdjIuemlwCiAgICBzdWRvIC4vYXdzL2luc3RhbGwgJj4gL2Rldi9udWxsCmZpCgojIEFzc3VtZSByb2xlIHRvIGdldCBhY2Nlc3MgdG8gdGhlIFNlY3JldHMKYXNzdW1lX3JvbGVfY3JlZGVudGlhbHM9JChhd3Mgc3RzIGFzc3VtZS1yb2xlIC0tcm9sZS1hcm4gJFJPTEVfQVJOIC0tcm9sZS1zZXNzaW9uLW5hbWUgJFNFU1NJT05fTkFNRSkKZXhwb3J0IEFXU19BQ0NFU1NfS0VZX0lEPSQoZWNobyAkYXNzdW1lX3JvbGVfY3JlZGVudGlhbHMgfCBqcSAtciAnLkNyZWRlbnRpYWxzLkFjY2Vzc0tleUlkJykKZXhwb3J0IEFXU19TRUNSRVRfQUNDRVNTX0tFWT0kKGVjaG8gJGFzc3VtZV9yb2xlX2NyZWRlbnRpYWxzIHwganEgLXIgJy5DcmVkZW50aWFscy5TZWNyZXRBY2Nlc3NLZXknKQpleHBvcnQgQVdTX1NFU1NJT05fVE9LRU49JChlY2hvICRhc3N1bWVfcm9sZV9jcmVkZW50aWFscyB8IGpxIC1yICcuQ3JlZGVudGlhbHMuU2Vzc2lvblRva2VuJykKCiMgUmV0cmlldmUgU2VjcmV0IGZyb20gU2VjcmV0cyBNYW5hZ2VyClNFQ1JFVF9KU09OPSQoYXdzIHNlY3JldHNtYW5hZ2VyIGdldC1zZWNyZXQtdmFsdWUgLS1zZWNyZXQtaWQgJFNFQ1JFVF9BUk4gLS1yZWdpb24gJFJFR0lPTiAtLXF1ZXJ5ICdTZWNyZXRTdHJpbmcnIC0tb3V0cHV0IHRleHQpCgojIFJldHJpdmluZyBQcmlzbWEgQ2xvdWQgU2VjcmV0cwpQQ0NfVVJMPSQoZWNobyAkU0VDUkVUX0pTT04gfCBqcSAtciAnLlBDQ19VUkwnKQpQQ0NfU0FOPSQoZWNobyAkU0VDUkVUX0pTT04gfCBqcSAtciAnLlBDQ19TQU4nKQpQQ0NfVVNFUj0kKGVjaG8gJFNFQ1JFVF9KU09OIHwganEgLXIgJy5QQ0NfVVNFUicpClBDQ19QQVNTPSQoZWNobyAkU0VDUkVUX0pTT04gfCBqcSAtciAnLlBDQ19QQVNTJykKdG9rZW49JChjdXJsIC1zIC1rICR7UENDX1VSTH0vYXBpL3YxL2F1dGhlbnRpY2F0ZSAtWCBQT1NUIC1IICJDb250ZW50LVR5cGU6IGFwcGxpY2F0aW9uL2pzb24iIC1kICd7InVzZXJuYW1lIjoiJyIkUENDX1VTRVIiJyIsICJwYXNzd29yZCI6IiciJFBDQ19QQVNTIicifScgfCBqcSAtciAnLnRva2VuJykKCiMgSW5zdGFsbGluZyBkZWZlbmRlcgppZiBzdWRvIGRvY2tlciBwcyAmPiAvZGV2L251bGw7IHRoZW4gYXJncz0iIjsgZWxzZSBhcmdzPSItLWluc3RhbGwtaG9zdCI7IGZpCmN1cmwgLXNTTCAtayAtLWhlYWRlciAiYXV0aG9yaXphdGlvbjogQmVhcmVyICR0b2tlbiIgLVggUE9TVCAke1BDQ19VUkx9L2FwaS92MS9zY3JpcHRzL2RlZmVuZGVyLnNoIHwgc3VkbyBiYXNoIC1zIC0tIC1jICIke1BDQ19TQU59IiAtbSAtdSAkYXJncwoKIyBSZW1vdmluZyBJbnN0YWxsZWQgcGFja2FnZXMKaWYgW1sgLW4gIiRpbnN0YWxsZWRfYXdzY2xpIiBdXSAKdGhlbgogICAgZWNobyAiUmVtb3ZpbmcgQVdTIENMSSBzaW5jZSBpdCB3YXMgbm90IGluc3RhbGxlZC4uLiIKICAgIHN1ZG8gcm0gLWYgYXdzY2xpdjIuemlwCiAgICBzdWRvIHJtIC1yZiAuL2F3cwogICAgc3VkbyBybSAvdXNyL2xvY2FsL2Jpbi9hd3MgCiAgICBzdWRvIHJtIC91c3IvbG9jYWwvYmluL2F3c19jb21wbGV0ZXIgCiAgICBzdWRvIHJtIC1yZiAvdXNyL2xvY2FsL2F3cy1jbGkKZmkKCmlmIFtbIC1uICIkbm90X2luc3RhbGxlZF9wYWNrYWdlcyIgXV0KdGhlbgogICAgZWNobyAiUmVtb3ZpbmcgdGhlIHBhY2thZ2VzICRub3RfaW5zdGFsbGVkX3BhY2thZ2VzIHNpbmNlIHdlcmUgbm90IGluc3RhbGxlZC4uLiIKICAgIGlmIGNvbW1hbmQgLXYgeXVtID4gL2Rldi9udWxsCiAgICB0aGVuCiAgICAgICAgc3VkbyB5dW0gcmVtb3ZlIC15ICRub3RfaW5zdGFsbGVkX3BhY2thZ2VzICY+IC9kZXYvbnVsbAogICAgZWxzZQogICAgICAgIHN1ZG8gYXB0IHJlbW92ZSAteSAkbm90X2luc3RhbGxlZF9wYWNrYWdlcyAmPiAvZGV2L251bGwKICAgIGZpCmZp" | base64 -d > /tmp/install_defender.sh
+          sudo bash /tmp/install_defender.sh ${SECRET_ARN} ${REGION} ${ROLE_ARN} ${SESSION_NAME}
+          rm /tmp/install_defender.sh
+
+        - SECRET_ARN: !Ref SecretArn
+          REGION: !Ref SecretRegion
+          ROLE_ARN: !Ref RoleArn
+          SESSION_NAME: !Ref SessionName
