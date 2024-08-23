@@ -178,7 +178,7 @@ do
                 --document-name "AWS-RunShellScript" \
                 --comment "Installing Prisma Cloud Defender on $os_type instance" \
                 --parameters 'commands=["echo \"'$script_content'\" | base64 --decode > /tmp/script.sh && sudo bash /tmp/script.sh \"'$token'\" \"'$PCC_URL'\" \"'$PCC_SAN'\" && rm -rf /tmp/script.sh"]' \
-                --output text > /dev/null
+                --output text &> /dev/null
             
             elif [ "$os_type" == "Windows" ]
             then
@@ -191,7 +191,7 @@ do
                 --document-name "AWS-RunPowerShellScript" \
                 --comment "Installing Prisma Cloud Defender on $os_type instance" \
                 --parameters commands=["$command"] \
-                --output text > /dev/null
+                --output text &> /dev/null
             fi
         done
     done
