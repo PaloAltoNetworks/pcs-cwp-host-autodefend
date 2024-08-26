@@ -1,5 +1,6 @@
 .env
 backup/
+*.txt
 
 # Terraform files
 .terraform/
