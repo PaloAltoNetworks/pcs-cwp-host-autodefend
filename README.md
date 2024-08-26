@@ -9,3 +9,9 @@ In order for the automation processes to work in Prisma Cloud, you must create a
 
 Once created this permissions group, you must create a role and then the belonging service account.
 
+## General Variables
+The general variables used in the processes are the following:
+1. **PCC_URL**: Prisma Cloud Compute URL. Can be obtained from the Prisma Cloud by going to **Runtime Security** > **Manage** > **System** > **Utilities** in the **Path to the Console** field.
+2. **PCC_USER**: is the Access Key of the Service account created.
+3. **PCC_PASS**: is the Secret Key of the Service account created.
+4. **PCC_SAN**: Console name. It can be obtained from the **PCC_URL** variable by extracting the Domain Name.
