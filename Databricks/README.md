@@ -18,4 +18,27 @@ It's is required to create secrets either through the Databricks default secret 
     ```bash
     databricks secrets create-scope prismacloud
     ```
-4. Put the secrets of the () 
+4. Store the [general variables](https://github.com/PaloAltoNetworks/pcs-cwp-host-autodefend?tab=readme-ov-file#general-variables) in the scope.
+    ```bash
+    databricks secrets put-secret prismacloud PCC_URL
+    databricks secrets put-secret prismacloud PCC_USER
+    databricks secrets put-secret prismacloud PCC_PASS
+    databricks secrets put-secret prismacloud PCC_SAN
+    ```
+    This values should be saved as text not as json.
+
+> **NOTE**
+> This process can change depending on your Secrets Management providers. Please refer to you corresponding provider to verify the integration.
+
+## Step 3: Setup Init Script
+To install the defender you can use a [Cluster-scoped init script](https://docs.databricks.com/en/init-scripts/cluster-scoped.html), to install the defender in a single cluster, or a [Global init script](https://docs.databricks.com/en/init-scripts/global.html) to install the defender across all the clusters in your environment. The contents of the script should be the one in the *databricks.sh* file.
+
+## Step 4: Load Secrets as Environment variables
+When creating or updating a cluster, it's required to retrieve the secrets stored. To do that please include the following environment variables in the Advanced Settings of the Cluster configuration:
+```bash
+PCC_SAN={{secrets/prismacloud/PCC_SAN}}
+PCC_URL={{secrets/prismacloud/PCC_URL}}
+PCC_PASS={{secrets/prismacloud/PCC_PASS}}
+PCC_USER={{secrets/prismacloud/PCC_USER}}
+```
+For already existing Clusters, it is required to restart the cluster so the defender gets installed.
