@@ -1,0 +1,26 @@
+{
+    "spark_env_vars.PCC_SAN": {
+        "type": "fixed",
+        "value": "{{secrets/prismacloud/PCC_SAN}}"
+    },
+    "spark_env_vars.PCC_URL": {
+        "type": "fixed",
+        "value": "{{secrets/prismacloud/PCC_URL}}"
+    },
+    "spark_env_vars.PCC_USER": {
+        "type": "fixed",
+        "value": "{{secrets/prismacloud/PCC_USER}}"
+    },
+    "spark_env_vars.PCC_PASS": {
+        "type": "fixed",
+        "value": "{{secrets/prismacloud/PCC_PASS}}"
+    },
+    "spark_env_vars.PYSPARK_PYTHON": {
+        "type": "fixed",
+        "value": "/databricks/python3/bin/python3"
+    },
+    "init_scripts.0.workspace.destination": {
+        "type": "fixed",
+        "value": "SCRIPT_PATH"
+    }
+}
