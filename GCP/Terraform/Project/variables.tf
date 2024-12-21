@@ -20,6 +20,11 @@ variable "project_id" {
   sensitive = true
 }
 
+variable "project_name" {
+  type    = string
+  default = "New Project"
+}
+
 variable "folder_id" {
   type      = string
   sensitive = true

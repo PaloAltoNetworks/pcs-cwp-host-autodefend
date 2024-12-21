@@ -27,18 +27,44 @@ It's is required to create secrets either through the Databricks default secret 
     ```
     This values should be saved as text not as json.
 
-> **NOTE**
-> This process can change depending on your Secrets Management providers. Please refer to you corresponding provider to verify the integration.
 
-## Step 3: Setup Init Script
-To install the defender you can use a [Cluster-scoped init script](https://docs.databricks.com/en/init-scripts/cluster-scoped.html), to install the defender in a single cluster, or a [Global init script](https://docs.databricks.com/en/init-scripts/global.html) to install the defender across all the clusters in your environment. The contents of the script should be the one in the *databricks.sh* file.
+> **NOTES**
+> - This process can change depending on your Secrets Management providers. Please refer to you corresponding provider to verify the integration.
 
-## Step 4: Load Secrets as Environment variables
-When creating or updating a cluster, it's required to retrieve the secrets stored. To do that please include the following environment variables in the Advanced Settings of the Cluster configuration:
-```bash
-PCC_SAN={{secrets/prismacloud/PCC_SAN}}
-PCC_URL={{secrets/prismacloud/PCC_URL}}
-PCC_PASS={{secrets/prismacloud/PCC_PASS}}
-PCC_USER={{secrets/prismacloud/PCC_USER}}
-```
-For already existing Clusters, it is required to restart the cluster so the defender gets installed.
+## Step 3: Upload Script
+In the Databricks console, go to **Workspace**. Here choose any path of your preference and create a file with the content of the file *install_script.sh* from this repository.
+
+
+![Install Defender Script Path](./images/install_defender_path.png)
+
+![Install Defender Script](./images/install_defender_script.png)
+
+
+> **NOTES**
+> - Instead of using workspaces you can use volumes. 
+
+## Step 4: 
+Edit an existing Compute Policy by going to **Compute** > **Policies** > Select the appropriate policy > **Edit** > and again click on the **edit** option next to the word *overrides*:
+
+![Edit Compute Policy](./images/edit_compute_policy.png)
+
+Here place the contents of the file *compute-policy-overrides.json* and replace the **SCRIPT_PATH** for the corresponding full path where the script is located.
+
+![Edit Compute Policy](./images/compute_policy_overrides.png)
+
+Once done save it.
+
+
+> **NOTES**
+> - If you are using volumes, then in the *compute-policy-overrides.json* you should replace the word **worplace** by **volumes**.
+> - You can also create your own compute policy to match your requirements when the cluster is being created.
+> - For more information regarding compute policies, visit the official [databricks documentation](https://docs.databricks.com/en/admin/clusters/policy-definition.html).
+
+## Step 5: Create Cluster
+Once is all set, create a Cluster and be sure to assign the overrided policy and verify that the overrides are in place.
+
+![Compute Cluster Creation](./images/compute_cluster_creation.png)
+
+![Compute Cluster Creation - Environment Variables](./images/compute_cluster_creation_envvars.png)
+
+![Compute Cluster Creation - Init Script](./images/compute_cluster_creation_initscript.png)
